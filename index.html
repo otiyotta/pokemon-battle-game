@@ -11,19 +11,33 @@
         <!-- プレイヤー1選択画面 -->
         <div id="player1-select-screen" class="screen">
             <h1>プレイヤー1 キャラクター選択</h1>
+            <div class="selected-characters">
+                <h3>選択中のキャラクター (<span id="player1-selected-count">0</span>/3)</h3>
+                <div id="player1-selected-list" class="selected-list">
+                    <!-- 選択済みキャラクターが動的に追加される -->
+                </div>
+            </div>
             <p class="instruction">キャラクターを選んでください</p>
             <div id="player1-character-grid" class="character-grid">
                 <!-- キャラクターカードは動的に生成される -->
             </div>
+            <button id="player1-confirm-btn" class="btn btn-primary" disabled>決定（3体選んでください）</button>
         </div>
 
         <!-- プレイヤー2選択画面 -->
         <div id="player2-select-screen" class="screen hidden">
             <h1>プレイヤー2 キャラクター選択</h1>
+            <div class="selected-characters">
+                <h3>選択中のキャラクター (<span id="player2-selected-count">0</span>/3)</h3>
+                <div id="player2-selected-list" class="selected-list">
+                    <!-- 選択済みキャラクターが動的に追加される -->
+                </div>
+            </div>
             <p class="instruction">キャラクターを選んでください</p>
             <div id="player2-character-grid" class="character-grid">
                 <!-- キャラクターカードは動的に生成される -->
             </div>
+            <button id="player2-confirm-btn" class="btn btn-primary" disabled>決定（3体選んでください）</button>
         </div>
 
         <!-- バトル画面 -->
@@ -47,6 +61,12 @@
                                     <div id="player1-hp-bar" class="hp-fill"></div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                    <div class="team-pokemon">
+                        <h3>控えのポケモン</h3>
+                        <div id="player1-bench" class="bench-list">
+                            <!-- 控えキャラクターが動的に追加される -->
                         </div>
                     </div>
                 </div>
@@ -79,12 +99,30 @@
                             </div>
                         </div>
                     </div>
+                    <div class="team-pokemon">
+                        <h3>控えのポケモン</h3>
+                        <div id="player2-bench" class="bench-list">
+                            <!-- 控えキャラクターが動的に追加される -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- アクションボタン -->
             <div class="action-buttons" id="move-buttons">
                 <!-- 4つの技ボタンは動的に生成される -->
+                <button id="switch-btn" class="btn btn-switch">交代する</button>
+            </div>
+        </div>
+
+        <!-- 交代モーダル -->
+        <div id="switch-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>交代するキャラクターを選んでください</h2>
+                <div id="switch-list" class="switch-list">
+                    <!-- 交代可能なキャラクターが動的に表示される -->
+                </div>
+                <button id="cancel-switch-btn" class="btn btn-secondary">キャンセル</button>
             </div>
         </div>
 

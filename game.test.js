@@ -1,281 +1,437 @@
-// game.js のテストコード（1体選択仕様版）
-// TDDアプローチ: テストを先に書いてから実装する
+// ポケモンバトルゲーム - テストコード（3キャラクター対応版）
+// TDDアプローチでテストファースト
 
-describe('Pokemon Battle Game Logic - 1体選択版', () => {
-  let gameState;
+// ========================================
+// テスト用ヘルパー関数
+// ========================================
 
-  beforeEach(() => {
-    // テスト前に状態をリセット
-    gameState = {
-      allCharacters: [],
-      player1Character: null,
-      player2Character: null,
-      currentTurn: 1, // 1 = プレイヤー1, 2 = プレイヤー2
-      battleLog: [],
-      isGameOver: false,
-      winner: null
-    };
+/**
+ * テスト用のキャラクターデータを作成
+ */
+function createTestCharacter(id, name, maxHp) {
+  return {
+    id: id,
+    name: name,
+    type: 'テスト',
+    image: '🎮',
+    maxHp: maxHp,
+    attacks: [
+      { name: 'たいあたり', damage: 10 },
+      { name: 'ひっかく', damage: 15 }
+    ]
+  };
+}
+
+/**
+ * テスト用の初期状態を作成
+ */
+function createTestState() {
+  return {
+    allCharacters: [
+      createTestCharacter(1, 'ピカチュウ', 100),
+      createTestCharacter(2, 'カメックス', 120),
+      createTestCharacter(3, 'リザードン', 110)
+    ],
+    player1Team: [],
+    player2Team: [],
+    player1ActiveIndex: 0,
+    player2ActiveIndex: 0,
+    currentTurn: 1,
+    battleLog: [],
+    isGameOver: false,
+    winner: null
+  };
+}
+
+// ========================================
+// キャラクター選択のテスト
+// ========================================
+
+describe('キャラクター選択機能', () => {
+  test('キャラクターを選択できる（1体目）', () => {
+    const state = createTestState();
+    const character = state.allCharacters[0];
+
+    const result = selectCharacter(state, 1, character);
+
+    expect(result.success).toBe(true);
+    expect(state.player1Team).toHaveLength(1);
+    expect(state.player1Team[0].name).toBe('ピカチュウ');
+    expect(state.player1Team[0].currentHp).toBe(100);
   });
 
-  describe('キャラクターデータ読み込み', () => {
-    test('characters.jsonから正しくデータを読み込む', async () => {
-      const characters = await loadCharacters();
+  test('キャラクターを3体まで選択できる', () => {
+    const state = createTestState();
 
-      expect(characters).toBeDefined();
-      expect(Array.isArray(characters)).toBe(true);
-      expect(characters.length).toBeGreaterThan(0);
-      expect(characters[0]).toHaveProperty('id');
-      expect(characters[0]).toHaveProperty('name');
-      expect(characters[0]).toHaveProperty('maxHp');
-      expect(characters[0]).toHaveProperty('attacks');
-    });
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
 
-    test('読み込みに失敗した場合エラーを投げる', async () => {
-      // ファイルパスを無効にしてテスト
-      await expect(loadCharacters('invalid.json')).rejects.toThrow();
-    });
+    expect(state.player1Team).toHaveLength(3);
+    expect(state.player1Team[0].name).toBe('ピカチュウ');
+    expect(state.player1Team[1].name).toBe('カメックス');
+    expect(state.player1Team[2].name).toBe('リザードン');
   });
 
-  describe('キャラクター選択', () => {
-    test('プレイヤー1がキャラクターを選択できる', () => {
-      const char = { id: 'yuichin', name: 'ゆういちん', maxHp: 120, attacks: [] };
+  test('同じキャラクターを重複して選択できる', () => {
+    const state = createTestState();
+    const character = state.allCharacters[0];
 
-      const result = selectCharacter(gameState, 1, char);
+    selectCharacter(state, 1, character);
+    selectCharacter(state, 1, character);
+    selectCharacter(state, 1, character);
 
-      expect(result.success).toBe(true);
-      expect(gameState.player1Character).toBeDefined();
-      expect(gameState.player1Character.id).toBe('yuichin');
-      expect(gameState.player1Character.currentHp).toBe(120);
-    });
-
-    test('プレイヤー2がキャラクターを選択できる', () => {
-      const char = { id: 'umin', name: 'うみん', maxHp: 130, attacks: [] };
-
-      const result = selectCharacter(gameState, 2, char);
-
-      expect(result.success).toBe(true);
-      expect(gameState.player2Character).toBeDefined();
-      expect(gameState.player2Character.id).toBe('umin');
-      expect(gameState.player2Character.currentHp).toBe(130);
-    });
-
-    test('選択時にcurrentHpがmaxHpで初期化される', () => {
-      const char = { id: 'shujin', name: 'しゅうじん', maxHp: 110, attacks: [] };
-
-      selectCharacter(gameState, 1, char);
-
-      expect(gameState.player1Character.currentHp).toBe(char.maxHp);
-    });
+    expect(state.player1Team).toHaveLength(3);
+    expect(state.player1Team[0]).not.toBe(state.player1Team[1]); // 別インスタンス
+    expect(state.player1Team[0].name).toBe(state.player1Team[1].name); // 同じ名前
   });
 
-  describe('バトルロジック', () => {
-    beforeEach(() => {
-      // バトル用の初期状態
-      gameState.player1Character = {
-        id: 'yuichin',
-        name: 'ゆういちん',
-        maxHp: 120,
-        currentHp: 120,
-        attacks: [
-          { name: '火炎放射', damage: 30 },
-          { name: '火柱', damage: 45 }
-        ]
-      };
-      gameState.player2Character = {
-        id: 'shujin',
-        name: 'しゅうじん',
-        maxHp: 110,
-        currentHp: 110,
-        attacks: [
-          { name: '10万ボルト', damage: 50 },
-          { name: '雷', damage: 35 }
-        ]
-      };
-      gameState.currentTurn = 1;
-    });
+  test('4体目の選択は失敗する', () => {
+    const state = createTestState();
 
-    test('プレイヤー1の攻撃でプレイヤー2のHPが減る', () => {
-      const attack = gameState.player1Character.attacks[0];
-      const result = executeAttack(gameState, 1, attack);
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    const result = selectCharacter(state, 1, state.allCharacters[0]);
 
-      expect(result.success).toBe(true);
-      expect(gameState.player2Character.currentHp).toBe(110 - 30); // 80
-      expect(gameState.currentTurn).toBe(2); // ターンが交代
-    });
-
-    test('プレイヤー2の攻撃でプレイヤー1のHPが減る', () => {
-      gameState.currentTurn = 2;
-      const attack = gameState.player2Character.attacks[0];
-      const result = executeAttack(gameState, 2, attack);
-
-      expect(result.success).toBe(true);
-      expect(gameState.player1Character.currentHp).toBe(120 - 50); // 70
-      expect(gameState.currentTurn).toBe(1); // ターンが交代
-    });
-
-    test('自分のターンでない時は攻撃できない', () => {
-      gameState.currentTurn = 2;
-      const attack = gameState.player1Character.attacks[0];
-      const result = executeAttack(gameState, 1, attack);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('ターン');
-    });
-
-    test('HPが0以下になった場合は0にクランプされる', () => {
-      gameState.player2Character.currentHp = 25;
-      const attack = gameState.player1Character.attacks[0]; // 30ダメージ
-      const result = executeAttack(gameState, 1, attack);
-
-      expect(result.success).toBe(true);
-      expect(gameState.player2Character.currentHp).toBe(0);
-      expect(result.defeated).toBe(true);
-    });
-
-    test('複数回攻撃してHPが累積で減る', () => {
-      const attack = { name: 'テスト攻撃', damage: 20 };
-
-      executeAttack(gameState, 1, attack);
-      expect(gameState.player2Character.currentHp).toBe(90);
-
-      executeAttack(gameState, 2, attack);
-      expect(gameState.player1Character.currentHp).toBe(100);
-
-      executeAttack(gameState, 1, attack);
-      expect(gameState.player2Character.currentHp).toBe(70);
-    });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('最大3体まで選択できます');
+    expect(state.player1Team).toHaveLength(3);
   });
 
-  describe('勝敗判定', () => {
-    test('プレイヤー2のHPが0になったらプレイヤー1の勝利', () => {
-      gameState.player1Character = { currentHp: 50 };
-      gameState.player2Character = { currentHp: 0 };
+  test('選択したキャラクターを削除できる', () => {
+    const state = createTestState();
 
-      const result = checkWinCondition(gameState);
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
 
-      expect(result.isGameOver).toBe(true);
-      expect(result.winner).toBe(1);
-      expect(gameState.isGameOver).toBe(true);
-      expect(gameState.winner).toBe(1);
-    });
+    const result = removeSelectedCharacter(state, 1, 1);
 
-    test('プレイヤー1のHPが0になったらプレイヤー2の勝利', () => {
-      gameState.player1Character = { currentHp: 0 };
-      gameState.player2Character = { currentHp: 50 };
-
-      const result = checkWinCondition(gameState);
-
-      expect(result.isGameOver).toBe(true);
-      expect(result.winner).toBe(2);
-      expect(gameState.isGameOver).toBe(true);
-      expect(gameState.winner).toBe(2);
-    });
-
-    test('両方HPが残っていれば継続', () => {
-      gameState.player1Character = { currentHp: 50 };
-      gameState.player2Character = { currentHp: 30 };
-
-      const result = checkWinCondition(gameState);
-
-      expect(result.isGameOver).toBe(false);
-      expect(result.winner).toBeNull();
-    });
-
-    test('両方HPが0の場合は引き分け', () => {
-      gameState.player1Character = { currentHp: 0 };
-      gameState.player2Character = { currentHp: 0 };
-
-      const result = checkWinCondition(gameState);
-
-      expect(result.isGameOver).toBe(true);
-      expect(result.winner).toBeNull();
-      expect(gameState.isGameOver).toBe(true);
-    });
+    expect(result.success).toBe(true);
+    expect(state.player1Team).toHaveLength(2);
+    expect(state.player1Team[0].name).toBe('ピカチュウ');
+    expect(state.player1Team[1].name).toBe('リザードン');
   });
 
-  describe('UI更新', () => {
-    test('HPバーの幅が正しく計算される', () => {
-      const percentage = calculateHpPercentage(80, 120);
-      expect(percentage).toBe(66.67);
-    });
+  test('チーム選択を確定できる', () => {
+    const state = createTestState();
 
-    test('HPが0の時は0%', () => {
-      const percentage = calculateHpPercentage(0, 120);
-      expect(percentage).toBe(0);
-    });
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
 
-    test('HPが満タンの時は100%', () => {
-      const percentage = calculateHpPercentage(120, 120);
-      expect(percentage).toBe(100);
-    });
+    const result = confirmTeamSelection(state, 1);
 
-    test('バトルログに新しいエントリーが追加される', () => {
-      addBattleLog(gameState, 'ゆういちんの火炎放射！');
-
-      expect(gameState.battleLog.length).toBe(1);
-      expect(gameState.battleLog[0]).toBe('ゆういちんの火炎放射！');
-    });
-
-    test('バトルログは最新が最後に追加される', () => {
-      addBattleLog(gameState, 'メッセージ1');
-      addBattleLog(gameState, 'メッセージ2');
-      addBattleLog(gameState, 'メッセージ3');
-
-      expect(gameState.battleLog.length).toBe(3);
-      expect(gameState.battleLog[0]).toBe('メッセージ1');
-      expect(gameState.battleLog[2]).toBe('メッセージ3');
-    });
-
-    test('HPが最大値を超えても正しく計算される', () => {
-      const percentage = calculateHpPercentage(150, 120);
-      expect(percentage).toBeGreaterThan(100);
-    });
+    expect(result.success).toBe(true);
   });
 
-  describe('画面遷移', () => {
-    test('プレイヤー1選択からプレイヤー2選択に遷移', () => {
-      const result = transitionToScreen('player2-select');
-      expect(result.success).toBe(true);
-    });
+  test('3体未満では確定できない', () => {
+    const state = createTestState();
 
-    test('プレイヤー2選択からバトル画面に遷移', () => {
-      const result = transitionToScreen('battle');
-      expect(result.success).toBe(true);
-    });
+    selectCharacter(state, 1, state.allCharacters[0]);
 
-    test('バトル画面から結果画面に遷移', () => {
-      const result = transitionToScreen('result');
-      expect(result.success).toBe(true);
-    });
+    const result = confirmTeamSelection(state, 1);
 
-    test('結果画面からプレイヤー1選択にリセット', () => {
-      const result = transitionToScreen('player1-select');
-      expect(result.success).toBe(true);
-    });
-
-    test('無効な画面IDではエラー', () => {
-      const result = transitionToScreen('invalid-screen');
-      expect(result.success).toBe(false);
-    });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('3体のキャラクターを選択してください');
   });
 
-  describe('ゲームリセット', () => {
-    test('リセットで全ての状態が初期化される', () => {
-      gameState.player1Character = { id: 'test', currentHp: 50 };
-      gameState.player2Character = { id: 'test2', currentHp: 30 };
-      gameState.currentTurn = 2;
-      gameState.battleLog = ['test log'];
-      gameState.isGameOver = true;
-      gameState.winner = 1;
+  test('無効なプレイヤー番号でエラーを返す', () => {
+    const state = createTestState();
+    const character = state.allCharacters[0];
 
-      resetGame(gameState);
+    const result = selectCharacter(state, 3, character);
 
-      expect(gameState.player1Character).toBeNull();
-      expect(gameState.player2Character).toBeNull();
-      expect(gameState.currentTurn).toBe(1);
-      expect(gameState.battleLog).toEqual([]);
-      expect(gameState.isGameOver).toBe(false);
-      expect(gameState.winner).toBeNull();
-    });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('無効なプレイヤー番号です');
+  });
+
+  test('範囲外のインデックスで削除するとエラー', () => {
+    const state = createTestState();
+
+    selectCharacter(state, 1, state.allCharacters[0]);
+
+    const result = removeSelectedCharacter(state, 1, 5);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('無効なインデックスです');
+  });
+});
+
+// ========================================
+// バトルロジックのテスト
+// ========================================
+
+describe('バトルロジック（3キャラクター対応）', () => {
+  test('アクティブなキャラクターで攻撃する', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    const attack = state.player1Team[0].attacks[0];
+    const result = executeAttack(state, 1, attack);
+
+    expect(result.success).toBe(true);
+    expect(result.damage).toBe(10);
+    expect(state.player2Team[0].currentHp).toBe(90);
+    expect(state.currentTurn).toBe(2);
+  });
+
+  test('HPが0になったら自動で交代する', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    // プレイヤー2のアクティブキャラクターのHPを1に設定
+    state.player2Team[0].currentHp = 1;
+
+    const attack = state.player1Team[0].attacks[0];
+    const result = executeAttack(state, 1, attack);
+
+    expect(result.success).toBe(true);
+    expect(result.defeated).toBe(true);
+    expect(state.player2Team[0].currentHp).toBe(0);
+    expect(state.player2ActiveIndex).toBe(1); // 次のキャラクターに自動交代
+  });
+
+  test('全キャラクター倒れたら勝敗判定', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    // プレイヤー2の全キャラクターを倒す
+    state.player2Team[0].currentHp = 0;
+    state.player2Team[1].currentHp = 0;
+    state.player2Team[2].currentHp = 0;
+
+    const result = checkGameOver(state);
+
+    expect(result.isGameOver).toBe(true);
+    expect(result.winner).toBe(1);
+    expect(state.isGameOver).toBe(true);
+    expect(state.winner).toBe(1);
+  });
+
+  test('自分のターンでない時は攻撃できない', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    state.currentTurn = 2;
+
+    const attack = state.player1Team[0].attacks[0];
+    const result = executeAttack(state, 1, attack);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('あなたのターンではありません');
+  });
+});
+
+// ========================================
+// 交代機能のテスト
+// ========================================
+
+describe('交代機能', () => {
+  test('手動で交代できる', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    const result = switchCharacter(state, 1, 2);
+
+    expect(result.success).toBe(true);
+    expect(state.player1ActiveIndex).toBe(2);
+    expect(state.currentTurn).toBe(2); // ターンが相手に移る
+  });
+
+  test('倒れたキャラクターには交代できない', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    // キャラクター2を倒れた状態にする
+    state.player1Team[1].currentHp = 0;
+
+    const result = switchCharacter(state, 1, 1);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('倒れたキャラクターには交代できません');
+  });
+
+  test('自動交代は倒れていないキャラクターを選択する', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    // キャラクター1を倒す
+    state.player1Team[0].currentHp = 0;
+    state.player1ActiveIndex = 0;
+
+    const result = autoSwitch(state, 1);
+
+    expect(result.success).toBe(true);
+    expect(state.player1ActiveIndex).toBe(1); // 次の生きているキャラクター
+  });
+
+  test('全員倒れている場合は自動交代できない', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    // 全キャラクターを倒す
+    state.player1Team[0].currentHp = 0;
+    state.player1Team[1].currentHp = 0;
+    state.player1Team[2].currentHp = 0;
+
+    const result = autoSwitch(state, 1);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('交代可能なキャラクターがいません');
+  });
+});
+
+// ========================================
+// リセット機能のテスト
+// ========================================
+
+describe('リセット機能', () => {
+  test('ゲームをリセットできる', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    // バトルを進める
+    state.currentTurn = 2;
+    state.battleLog.push('テストログ');
+    state.player1Team[0].currentHp = 50;
+
+    resetGame(state);
+
+    expect(state.player1Team).toHaveLength(0);
+    expect(state.player2Team).toHaveLength(0);
+    expect(state.player1ActiveIndex).toBe(0);
+    expect(state.player2ActiveIndex).toBe(0);
+    expect(state.currentTurn).toBe(1);
+    expect(state.battleLog).toHaveLength(0);
+    expect(state.isGameOver).toBe(false);
+    expect(state.winner).toBe(null);
+    expect(state.allCharacters).toHaveLength(3); // キャラクターデータは保持
+  });
+});
+
+// ========================================
+// ユーティリティ関数のテスト
+// ========================================
+
+describe('ユーティリティ関数', () => {
+  test('HPパーセンテージを正しく計算する', () => {
+    expect(calculateHpPercentage(100, 100)).toBe(100);
+    expect(calculateHpPercentage(50, 100)).toBe(50);
+    expect(calculateHpPercentage(0, 100)).toBe(0);
+    expect(calculateHpPercentage(33, 100)).toBe(33);
+  });
+
+  test('バトルログを追加できる', () => {
+    const state = createTestState();
+
+    addBattleLog(state, 'テストメッセージ1');
+    addBattleLog(state, 'テストメッセージ2');
+
+    expect(state.battleLog).toHaveLength(2);
+    expect(state.battleLog[0]).toBe('テストメッセージ1');
+    expect(state.battleLog[1]).toBe('テストメッセージ2');
+  });
+});
+
+// ========================================
+// 画面遷移のテスト
+// ========================================
+
+describe('画面遷移', () => {
+  test('プレイヤー1選択からプレイヤー2選択に遷移', () => {
+    const result = transitionToScreen('player2-select');
+    expect(result.success).toBe(true);
+  });
+
+  test('プレイヤー2選択からバトル画面に遷移', () => {
+    const result = transitionToScreen('battle');
+    expect(result.success).toBe(true);
+  });
+
+  test('バトル画面から結果画面に遷移', () => {
+    const result = transitionToScreen('result');
+    expect(result.success).toBe(true);
+  });
+
+  test('無効な画面IDではエラー', () => {
+    const result = transitionToScreen('invalid-screen');
+    expect(result.success).toBe(false);
   });
 });

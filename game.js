@@ -6,8 +6,10 @@
 // ========================================
 let gameState = {
   allCharacters: [],           // 全キャラクターのマスターデータ
-  player1Character: null,      // プレイヤー1の選択キャラクター
-  player2Character: null,      // プレイヤー2の選択キャラクター
+  player1Team: [],             // プレイヤー1の選択キャラクター（3体）
+  player2Team: [],             // プレイヤー2の選択キャラクター（3体）
+  player1ActiveIndex: 0,       // プレイヤー1のアクティブキャラクターのインデックス
+  player2ActiveIndex: 0,       // プレイヤー2のアクティブキャラクターのインデックス
   currentTurn: 1,              // 現在のターン（1 = プレイヤー1, 2 = プレイヤー2）
   battleLog: [],               // バトルログメッセージ
   isGameOver: false,           // ゲーム終了フラグ
@@ -61,23 +63,69 @@ async function initGame() {
 // ========================================
 
 /**
- * キャラクターを選択する
+ * キャラクターを選択する（3体選択対応）
  * @param {Object} state - ゲーム状態
  * @param {number} player - プレイヤー番号（1 or 2）
  * @param {Object} character - 選択するキャラクター
  * @returns {Object} 結果オブジェクト
  */
 function selectCharacter(state, player, character) {
-  // キャラクターをコピーしてcurrentHpを初期化
+  // プレイヤー番号の検証
+  if (player !== 1 && player !== 2) {
+    return { success: false, error: '無効なプレイヤー番号です' };
+  }
+
+  // チームの選択
+  const team = player === 1 ? state.player1Team : state.player2Team;
+
+  // 最大3体まで
+  if (team.length >= 3) {
+    return { success: false, error: '最大3体まで選択できます' };
+  }
+
+  // キャラクターをディープコピーしてcurrentHpを初期化
   const selectedCharacter = {
     ...character,
-    currentHp: character.maxHp
+    currentHp: character.maxHp,
+    attacks: character.attacks.map(attack => ({ ...attack }))
   };
 
-  if (player === 1) {
-    state.player1Character = selectedCharacter;
-  } else {
-    state.player2Character = selectedCharacter;
+  team.push(selectedCharacter);
+
+  return { success: true };
+}
+
+/**
+ * 選択したキャラクターを削除する
+ * @param {Object} state - ゲーム状態
+ * @param {number} player - プレイヤー番号（1 or 2）
+ * @param {number} index - 削除するインデックス
+ * @returns {Object} 結果オブジェクト
+ */
+function removeSelectedCharacter(state, player, index) {
+  const team = player === 1 ? state.player1Team : state.player2Team;
+
+  // インデックスの検証
+  if (index < 0 || index >= team.length) {
+    return { success: false, error: '無効なインデックスです' };
+  }
+
+  team.splice(index, 1);
+  return { success: true };
+}
+
+/**
+ * チーム選択を確定する
+ * @param {Object} state - ゲーム状態
+ * @param {number} player - プレイヤー番号（1 or 2）
+ * @returns {Object} 結果オブジェクト
+ */
+function confirmTeamSelection(state, player) {
+  const team = player === 1 ? state.player1Team : state.player2Team;
+
+  // 3体選択しているか確認
+  if (team.length !== 3) {
+    return { success: false, error: '3体のキャラクターを選択してください' };
   }
 
   return { success: true };
@@ -88,7 +136,7 @@ function selectCharacter(state, player, character) {
 // ========================================
 
 /**
- * 攻撃を実行する
+ * 攻撃を実行する（3キャラクター対応）
  * @param {Object} state - ゲーム状態
  * @param {number} player - 攻撃するプレイヤー番号（1 or 2）
  * @param {Object} attack - 使用する技
@@ -101,8 +149,13 @@ function executeAttack(state, player, attack) {
   }
 
   // 攻撃側と防御側のキャラクターを取得
-  const attacker = player === 1 ? state.player1Character : state.player2Character;
-  const defender = player === 1 ? state.player2Character : state.player1Character;
+  const attackerTeam = player === 1 ? state.player1Team : state.player2Team;
+  const defenderTeam = player === 1 ? state.player2Team : state.player1Team;
+  const attackerIndex = player === 1 ? state.player1ActiveIndex : state.player2ActiveIndex;
+  const defenderIndex = player === 1 ? state.player2ActiveIndex : state.player1ActiveIndex;
+
+  const attacker = attackerTeam[attackerIndex];
+  const defender = defenderTeam[defenderIndex];
 
   // ダメージを計算して適用
   const damage = attack.damage;
@@ -116,6 +169,15 @@ function executeAttack(state, player, attack) {
   const defeated = defender.currentHp === 0;
   if (defeated) {
     addBattleLog(state, `${defender.name}は倒れた！`);
+
+    // 自動交代を試みる
+    const defenderPlayer = player === 1 ? 2 : 1;
+    const switchResult = autoSwitch(state, defenderPlayer);
+
+    if (switchResult.success) {
+      const newDefender = defenderTeam[player === 1 ? state.player2ActiveIndex : state.player1ActiveIndex];
+      addBattleLog(state, `${newDefender.name}が出てきた！`);
+    }
   }
 
   // ターンを交代
@@ -124,35 +186,98 @@ function executeAttack(state, player, attack) {
   return { success: true, damage, defeated };
 }
 
+/**
+ * 自動交代を実行する
+ * @param {Object} state - ゲーム状態
+ * @param {number} player - プレイヤー番号（1 or 2）
+ * @returns {Object} 結果オブジェクト
+ */
+function autoSwitch(state, player) {
+  const team = player === 1 ? state.player1Team : state.player2Team;
+
+  // 倒れていないキャラクターを探す
+  const aliveIndex = team.findIndex(char => char.currentHp > 0);
+
+  if (aliveIndex === -1) {
+    return { success: false, error: '交代可能なキャラクターがいません' };
+  }
+
+  // アクティブインデックスを更新
+  if (player === 1) {
+    state.player1ActiveIndex = aliveIndex;
+  } else {
+    state.player2ActiveIndex = aliveIndex;
+  }
+
+  return { success: true, newIndex: aliveIndex };
+}
+
+/**
+ * 手動で交代する
+ * @param {Object} state - ゲーム状態
+ * @param {number} player - プレイヤー番号（1 or 2）
+ * @param {number} newIndex - 交代先のインデックス
+ * @returns {Object} 結果オブジェクト
+ */
+function switchCharacter(state, player, newIndex) {
+  const team = player === 1 ? state.player1Team : state.player2Team;
+
+  // インデックスの検証
+  if (newIndex < 0 || newIndex >= team.length) {
+    return { success: false, error: '無効なインデックスです' };
+  }
+
+  // 倒れたキャラクターには交代できない
+  if (team[newIndex].currentHp === 0) {
+    return { success: false, error: '倒れたキャラクターには交代できません' };
+  }
+
+  // アクティブインデックスを更新
+  if (player === 1) {
+    state.player1ActiveIndex = newIndex;
+  } else {
+    state.player2ActiveIndex = newIndex;
+  }
+
+  // バトルログに追加
+  addBattleLog(state, `プレイヤー${player}は${team[newIndex].name}に交代した！`);
+
+  // ターンを相手に渡す
+  state.currentTurn = player === 1 ? 2 : 1;
+
+  return { success: true };
+}
+
 // ========================================
 // 勝敗判定
 // ========================================
 
 /**
- * 勝利条件をチェックする
+ * ゲームオーバーかどうかをチェックする（3キャラクター対応）
  * @param {Object} state - ゲーム状態
  * @returns {Object} 結果オブジェクト
  */
-function checkWinCondition(state) {
-  const player1Defeated = state.player1Character && state.player1Character.currentHp === 0;
-  const player2Defeated = state.player2Character && state.player2Character.currentHp === 0;
+function checkGameOver(state) {
+  // 全キャラクターが倒れているかチェック
+  const player1AllFainted = state.player1Team.every(char => char.currentHp === 0);
+  const player2AllFainted = state.player2Team.every(char => char.currentHp === 0);
 
   // 両方倒れた場合は引き分け
-  if (player1Defeated && player2Defeated) {
+  if (player1AllFainted && player2AllFainted) {
     state.isGameOver = true;
     state.winner = null;
     return { isGameOver: true, winner: null };
   }
 
-  // プレイヤー1が倒れた場合はプレイヤー2の勝利
-  if (player1Defeated) {
+  // プレイヤー1が全滅した場合はプレイヤー2の勝利
+  if (player1AllFainted) {
     state.isGameOver = true;
     state.winner = 2;
     return { isGameOver: true, winner: 2 };
   }
 
-  // プレイヤー2が倒れた場合はプレイヤー1の勝利
-  if (player2Defeated) {
+  // プレイヤー2が全滅した場合はプレイヤー1の勝利
+  if (player2AllFainted) {
     state.isGameOver = true;
     state.winner = 1;
     return { isGameOver: true, winner: 1 };
@@ -161,6 +286,9 @@ function checkWinCondition(state) {
   // まだ続行
   return { isGameOver: false, winner: null };
 }
+
+// 後方互換性のため別名も用意
+const checkWinCondition = checkGameOver;
 
 // ========================================
 // UI更新ヘルパー
@@ -213,16 +341,20 @@ function transitionToScreen(screenId) {
 // ========================================
 
 /**
- * ゲームをリセットする
+ * ゲームをリセットする（3キャラクター対応）
  * @param {Object} state - ゲーム状態
  */
 function resetGame(state) {
-  state.player1Character = null;
-  state.player2Character = null;
+  // チームをクリア
+  state.player1Team = [];
+  state.player2Team = [];
+  state.player1ActiveIndex = 0;
+  state.player2ActiveIndex = 0;
   state.currentTurn = 1;
   state.battleLog = [];
   state.isGameOver = false;
   state.winner = null;
+  // allCharactersは保持する
 }
 
 // ========================================
@@ -230,7 +362,7 @@ function resetGame(state) {
 // ========================================
 
 /**
- * キャラクター選択画面をレンダリングする
+ * キャラクター選択画面をレンダリングする（3キャラクター対応）
  * @param {number} player - プレイヤー番号（1 or 2）
  */
 function renderCharacterSelection(player) {
@@ -247,6 +379,9 @@ function renderCharacterSelection(player) {
     const card = createCharacterCard(character, player);
     grid.appendChild(card);
   });
+
+  // 選択済みリストを更新
+  updateSelectedList(player);
 }
 
 /**
@@ -281,26 +416,82 @@ function createCharacterCard(character, player) {
 }
 
 /**
- * キャラクターカードクリックを処理する
+ * 選択済みリストを更新する
+ * @param {number} player - プレイヤー番号
+ */
+function updateSelectedList(player) {
+  const team = player === 1 ? gameState.player1Team : gameState.player2Team;
+  const listId = `player${player}-selected-list`;
+  const countId = `player${player}-selected-count`;
+  const btnId = `player${player}-confirm-btn`;
+
+  const list = document.getElementById(listId);
+  const count = document.getElementById(countId);
+  const btn = document.getElementById(btnId);
+
+  if (!list) return;
+
+  // リストをクリア
+  list.innerHTML = '';
+
+  // 選択済みキャラクターを表示
+  team.forEach((character, index) => {
+    const item = document.createElement('div');
+    item.className = 'selected-item';
+    item.innerHTML = `
+      <span class="selected-char-image">${character.image}</span>
+      <span class="selected-char-name">${character.name}</span>
+      <button class="btn-remove" data-index="${index}">×</button>
+    `;
+
+    // 削除ボタンのイベント
+    const removeBtn = item.querySelector('.btn-remove');
+    removeBtn.addEventListener('click', () => {
+      removeSelectedCharacter(gameState, player, index);
+      updateSelectedList(player);
+    });
+
+    list.appendChild(item);
+  });
+
+  // カウント表示を更新
+  if (count) {
+    count.textContent = team.length;
+  }
+
+  // 決定ボタンの有効/無効を切り替え
+  if (btn) {
+    if (team.length === 3) {
+      btn.disabled = false;
+      btn.textContent = '決定';
+    } else {
+      btn.disabled = true;
+      btn.textContent = `決定（${3 - team.length}体選んでください）`;
+    }
+  }
+}
+
+/**
+ * キャラクターカードクリックを処理する（3キャラクター対応）
  * @param {Object} character - キャラクターデータ
  * @param {number} player - プレイヤー番号
  */
 function handleCharacterCardClick(character, player) {
   // キャラクターを選択
-  selectCharacter(gameState, player, character);
+  const result = selectCharacter(gameState, player, character);
 
-  // 次の画面に遷移
-  if (player === 1) {
-    renderCharacterSelection(2);
-    transitionToScreen('player2-select');
-  } else {
-    initBattleScreen();
-    transitionToScreen('battle');
+  if (!result.success) {
+    // 最大数に達している場合はアラート
+    alert(result.error);
+    return;
   }
+
+  // 選択済みリストを更新
+  updateSelectedList(player);
 }
 
 /**
- * バトル画面を初期化する
+ * バトル画面を初期化する（3キャラクター対応）
  */
 function initBattleScreen() {
   // 状態をリセット
@@ -308,10 +499,12 @@ function initBattleScreen() {
   gameState.battleLog = [];
   gameState.isGameOver = false;
   gameState.winner = null;
+  gameState.player1ActiveIndex = 0;
+  gameState.player2ActiveIndex = 0;
 
   // 初期ログ
   addBattleLog(gameState, 'バトルスタート！');
-  addBattleLog(gameState, `${gameState.player1Character.name} VS ${gameState.player2Character.name}！`);
+  addBattleLog(gameState, `${gameState.player1Team[0].name} VS ${gameState.player2Team[0].name}！`);
   addBattleLog(gameState, 'プレイヤー1のターン！');
 
   // UIを更新
@@ -319,14 +512,16 @@ function initBattleScreen() {
 }
 
 /**
- * バトル画面のUIを更新する
+ * バトル画面のUIを更新する（3キャラクター対応）
  */
 function updateBattleUI() {
   // プレイヤー1
   updatePlayerUI(1);
+  updateBenchDisplay(1);
 
   // プレイヤー2
   updatePlayerUI(2);
+  updateBenchDisplay(2);
 
   // バトルログ
   updateBattleLogUI();
@@ -336,11 +531,13 @@ function updateBattleUI() {
 }
 
 /**
- * プレイヤーのUIを更新する
+ * プレイヤーのUIを更新する（3キャラクター対応）
  * @param {number} player - プレイヤー番号
  */
 function updatePlayerUI(player) {
-  const character = player === 1 ? gameState.player1Character : gameState.player2Character;
+  const team = player === 1 ? gameState.player1Team : gameState.player2Team;
+  const activeIndex = player === 1 ? gameState.player1ActiveIndex : gameState.player2ActiveIndex;
+  const character = team[activeIndex];
 
   if (!character) return;
 
@@ -366,6 +563,49 @@ function updatePlayerUI(player) {
 
   // HP
   updateHPDisplay(player, character);
+}
+
+/**
+ * 控えキャラクターの表示を更新する
+ * @param {number} player - プレイヤー番号
+ */
+function updateBenchDisplay(player) {
+  const team = player === 1 ? gameState.player1Team : gameState.player2Team;
+  const activeIndex = player === 1 ? gameState.player1ActiveIndex : gameState.player2ActiveIndex;
+  const benchId = `player${player}-bench`;
+  const bench = document.getElementById(benchId);
+
+  if (!bench) return;
+
+  bench.innerHTML = '';
+
+  team.forEach((character, index) => {
+    // アクティブなキャラクターはスキップ
+    if (index === activeIndex) return;
+
+    const item = document.createElement('div');
+    item.className = 'bench-pokemon';
+
+    // 倒れている場合は半透明
+    if (character.currentHp === 0) {
+      item.classList.add('fainted');
+    }
+
+    const hpPercentage = calculateHpPercentage(character.currentHp, character.maxHp);
+
+    item.innerHTML = `
+      <div class="bench-image">${character.image}</div>
+      <div class="bench-info">
+        <div class="bench-name">${character.name}</div>
+        <div class="bench-hp-bar">
+          <div class="bench-hp-fill" style="width: ${hpPercentage}%"></div>
+        </div>
+        <div class="bench-hp-text">${character.currentHp}/${character.maxHp}</div>
+      </div>
+    `;
+
+    bench.appendChild(item);
+  });
 }
 
 /**
@@ -419,12 +659,14 @@ function updateBattleLogUI() {
 }
 
 /**
- * 技ボタンを更新する
+ * 技ボタンを更新する（3キャラクター対応）
  */
 function updateMoveButtons() {
   const moveButtons = document.getElementById('move-buttons');
   if (!moveButtons) return;
 
+  // 交代ボタン以外をクリア
+  const switchBtn = document.getElementById('switch-btn');
   moveButtons.innerHTML = '';
 
   if (gameState.isGameOver) {
@@ -432,7 +674,9 @@ function updateMoveButtons() {
   }
 
   const currentPlayer = gameState.currentTurn;
-  const character = currentPlayer === 1 ? gameState.player1Character : gameState.player2Character;
+  const team = currentPlayer === 1 ? gameState.player1Team : gameState.player2Team;
+  const activeIndex = currentPlayer === 1 ? gameState.player1ActiveIndex : gameState.player2ActiveIndex;
+  const character = team[activeIndex];
 
   if (!character) return;
 
@@ -455,10 +699,15 @@ function updateMoveButtons() {
     button.addEventListener('click', () => handleAttackClick(attack));
     moveButtons.appendChild(button);
   });
+
+  // 交代ボタンを追加
+  if (switchBtn) {
+    moveButtons.appendChild(switchBtn);
+  }
 }
 
 /**
- * 攻撃ボタンクリック時の処理
+ * 攻撃ボタンクリック時の処理（3キャラクター対応）
  * @param {Object} attack - 使用する技
  */
 function handleAttackClick(attack) {
@@ -476,14 +725,22 @@ function handleAttackClick(attack) {
   updateBattleUI();
 
   // ターン変更のログを追加
-  if (!result.defeated && !gameState.isGameOver) {
+  if (!gameState.isGameOver) {
     addBattleLog(gameState, `プレイヤー${gameState.currentTurn}のターン！`);
     updateBattleLogUI();
   }
 
   // 勝敗判定
-  const winCheck = checkWinCondition(gameState);
+  const winCheck = checkGameOver(gameState);
   if (winCheck.isGameOver) {
+    addBattleLog(gameState, '───────────────────────');
+    if (winCheck.winner) {
+      addBattleLog(gameState, `プレイヤー${winCheck.winner}の勝利！`);
+    } else {
+      addBattleLog(gameState, '引き分け！');
+    }
+    updateBattleLogUI();
+
     setTimeout(() => {
       showResultScreen();
     }, 1500);
@@ -512,7 +769,7 @@ function showResultScreen() {
 }
 
 /**
- * 最終的なキャラクター状態をレンダリングする
+ * 最終的なチーム状態をレンダリングする（3キャラクター対応）
  * @param {number} player - プレイヤー番号
  */
 function renderFinalCharacter(player) {
@@ -521,26 +778,28 @@ function renderFinalCharacter(player) {
 
   if (!container) return;
 
-  const character = player === 1 ? gameState.player1Character : gameState.player2Character;
+  const team = player === 1 ? gameState.player1Team : gameState.player2Team;
 
-  if (!character) return;
+  if (!team || team.length === 0) return;
 
   container.innerHTML = '';
 
-  const item = document.createElement('div');
-  item.className = 'final-pokemon';
+  team.forEach(character => {
+    const item = document.createElement('div');
+    item.className = 'final-pokemon';
 
-  if (character.currentHp === 0) {
-    item.classList.add('fainted');
-  }
+    if (character.currentHp === 0) {
+      item.classList.add('fainted');
+    }
 
-  item.innerHTML = `
-    <div class="final-image">${character.image}</div>
-    <div class="final-name">${character.name}</div>
-    <div class="final-hp">HP: ${character.currentHp}/${character.maxHp}</div>
-  `;
+    item.innerHTML = `
+      <div class="final-image">${character.image}</div>
+      <div class="final-name">${character.name}</div>
+      <div class="final-hp">HP: ${character.currentHp}/${character.maxHp}</div>
+    `;
 
-  container.appendChild(item);
+    container.appendChild(item);
+  });
 }
 
 /**
@@ -557,12 +816,109 @@ function restartGame() {
 // ========================================
 
 /**
- * ページ読み込み時の初期化とイベントリスナー設定
+ * 交代モーダルを表示する
+ */
+function showSwitchModal() {
+  const modal = document.getElementById('switch-modal');
+  const switchList = document.getElementById('switch-list');
+
+  if (!modal || !switchList) return;
+
+  const currentPlayer = gameState.currentTurn;
+  const team = currentPlayer === 1 ? gameState.player1Team : gameState.player2Team;
+  const activeIndex = currentPlayer === 1 ? gameState.player1ActiveIndex : gameState.player2ActiveIndex;
+
+  switchList.innerHTML = '';
+
+  team.forEach((character, index) => {
+    // アクティブなキャラクターと倒れたキャラクターはスキップ
+    if (index === activeIndex || character.currentHp === 0) return;
+
+    const item = document.createElement('div');
+    item.className = 'switch-item';
+    item.innerHTML = `
+      <div class="switch-char-image">${character.image}</div>
+      <div class="switch-char-info">
+        <div class="switch-char-name">${character.name}</div>
+        <div class="switch-char-hp">HP: ${character.currentHp}/${character.maxHp}</div>
+      </div>
+    `;
+
+    item.addEventListener('click', () => {
+      switchCharacter(gameState, currentPlayer, index);
+      hideSwitchModal();
+      updateBattleUI();
+      addBattleLog(gameState, `プレイヤー${gameState.currentTurn}のターン！`);
+      updateBattleLogUI();
+    });
+
+    switchList.appendChild(item);
+  });
+
+  modal.classList.remove('hidden');
+}
+
+/**
+ * 交代モーダルを非表示にする
+ */
+function hideSwitchModal() {
+  const modal = document.getElementById('switch-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+/**
+ * ページ読み込み時の初期化とイベントリスナー設定（3キャラクター対応）
  */
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
     // ゲーム初期化
     initGame();
+
+    // プレイヤー1決定ボタン
+    const player1ConfirmBtn = document.getElementById('player1-confirm-btn');
+    if (player1ConfirmBtn) {
+      player1ConfirmBtn.addEventListener('click', () => {
+        const result = confirmTeamSelection(gameState, 1);
+        if (result.success) {
+          renderCharacterSelection(2);
+          transitionToScreen('player2-select');
+        } else {
+          alert(result.error);
+        }
+      });
+    }
+
+    // プレイヤー2決定ボタン
+    const player2ConfirmBtn = document.getElementById('player2-confirm-btn');
+    if (player2ConfirmBtn) {
+      player2ConfirmBtn.addEventListener('click', () => {
+        const result = confirmTeamSelection(gameState, 2);
+        if (result.success) {
+          initBattleScreen();
+          transitionToScreen('battle');
+        } else {
+          alert(result.error);
+        }
+      });
+    }
+
+    // 交代ボタン
+    const switchBtn = document.getElementById('switch-btn');
+    if (switchBtn) {
+      switchBtn.addEventListener('click', () => {
+        showSwitchModal();
+      });
+    }
+
+    // 交代キャンセルボタン
+    const cancelSwitchBtn = document.getElementById('cancel-switch-btn');
+    if (cancelSwitchBtn) {
+      cancelSwitchBtn.addEventListener('click', () => {
+        hideSwitchModal();
+      });
+    }
 
     // リスタートボタン
     const restartBtn = document.getElementById('restart-btn');
@@ -579,7 +935,12 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     loadCharacters,
     selectCharacter,
+    removeSelectedCharacter,
+    confirmTeamSelection,
     executeAttack,
+    autoSwitch,
+    switchCharacter,
+    checkGameOver,
     checkWinCondition,
     calculateHpPercentage,
     addBattleLog,
