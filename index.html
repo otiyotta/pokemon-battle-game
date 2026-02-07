@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポケモンバトルゲーム</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- プレイヤー1選択画面 -->
+        <div id="player1-select-screen" class="screen">
+            <h1>プレイヤー1 キャラクター選択</h1>
+            <p class="instruction">キャラクターを選んでください</p>
+            <div id="player1-character-grid" class="character-grid">
+                <!-- キャラクターカードは動的に生成される -->
+            </div>
+        </div>
+
+        <!-- プレイヤー2選択画面 -->
+        <div id="player2-select-screen" class="screen hidden">
+            <h1>プレイヤー2 キャラクター選択</h1>
+            <p class="instruction">キャラクターを選んでください</p>
+            <div id="player2-character-grid" class="character-grid">
+                <!-- キャラクターカードは動的に生成される -->
+            </div>
+        </div>
+
+        <!-- バトル画面 -->
+        <div id="battle-screen" class="screen hidden">
+            <h1>ポケモンバトル</h1>
+
+            <div class="battle-area">
+                <!-- プレイヤー1エリア -->
+                <div class="player-area" id="player1-area">
+                    <h2>プレイヤー1</h2>
+                    <div class="active-pokemon">
+                        <div class="pokemon-sprite">
+                            <img id="player1-sprite" src="" alt="プレイヤー1のポケモン">
+                        </div>
+                        <div class="pokemon-info">
+                            <div class="pokemon-name" id="player1-name">-</div>
+                            <div class="pokemon-type" id="player1-type">-</div>
+                            <div class="hp-bar-container">
+                                <div class="hp-label">HP: <span id="player1-hp-text">0/0</span></div>
+                                <div class="hp-bar">
+                                    <div id="player1-hp-bar" class="hp-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- バトルログ -->
+                <div class="battle-center">
+                    <div class="battle-log-container">
+                        <h3>バトルログ</h3>
+                        <div id="battle-log" class="battle-log">
+                            <div class="log-entry">バトルスタート！</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- プレイヤー2エリア -->
+                <div class="player-area" id="player2-area">
+                    <h2>プレイヤー2</h2>
+                    <div class="active-pokemon">
+                        <div class="pokemon-sprite">
+                            <img id="player2-sprite" src="" alt="プレイヤー2のポケモン">
+                        </div>
+                        <div class="pokemon-info">
+                            <div class="pokemon-name" id="player2-name">-</div>
+                            <div class="pokemon-type" id="player2-type">-</div>
+                            <div class="hp-bar-container">
+                                <div class="hp-label">HP: <span id="player2-hp-text">0/0</span></div>
+                                <div class="hp-bar">
+                                    <div id="player2-hp-bar" class="hp-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="action-buttons" id="move-buttons">
+                <!-- 4つの技ボタンは動的に生成される -->
+            </div>
+        </div>
+
+        <!-- 結果画面 -->
+        <div id="result-screen" class="screen hidden">
+            <h1>バトル終了</h1>
+            <div class="result-content">
+                <div id="winner-announcement" class="winner-text">
+                    <!-- 勝者発表 -->
+                </div>
+                <div class="result-details">
+                    <div class="player-result">
+                        <h2>プレイヤー1</h2>
+                        <div id="player1-final-team" class="final-team">
+                            <!-- 最終的なチーム状態 -->
+                        </div>
+                    </div>
+                    <div class="player-result">
+                        <h2>プレイヤー2</h2>
+                        <div id="player2-final-team" class="final-team">
+                            <!-- 最終的なチーム状態 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="result-actions">
+                <button id="restart-btn" class="btn btn-primary">もう一度遊ぶ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- キャラクターカードテンプレート -->
+    <template id="character-card-template">
+        <div class="character-card" data-character-id="">
+            <img class="character-image" src="" alt="">
+            <div class="character-info">
+                <div class="character-name"></div>
+                <div class="character-type"></div>
+                <div class="character-stats">
+                    <div>HP: <span class="stat-hp"></span></div>
+                    <div>攻撃: <span class="stat-attack"></span></div>
+                    <div>防御: <span class="stat-defense"></span></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+
+    <script src="game.js"></script>
+</body>
+</html>
