@@ -397,7 +397,7 @@ function createCharacterCard(character, player) {
 
   // カードの内容
   card.innerHTML = `
-    <div class="character-image">${character.image}</div>
+    <img class="character-image" src="${character.image}" alt="${character.name}">
     <div class="character-info">
       <div class="character-name">${character.name}</div>
       <div class="character-type">${character.type}</div>
@@ -439,7 +439,7 @@ function updateSelectedList(player) {
     const item = document.createElement('div');
     item.className = 'selected-item';
     item.innerHTML = `
-      <span class="selected-char-image">${character.image}</span>
+      <img class="selected-char-image" src="${character.image}" alt="${character.name}">
       <span class="selected-char-name">${character.name}</span>
       <button class="btn-remove" data-index="${index}">×</button>
     `;
@@ -541,12 +541,11 @@ function updatePlayerUI(player) {
 
   if (!character) return;
 
-  // スプライト（絵文字）
+  // スプライト（画像）
   const sprite = document.getElementById(`player${player}-sprite`);
   if (sprite) {
-    sprite.textContent = character.image;
-    sprite.style.fontSize = '80px';
-    sprite.removeAttribute('src');
+    sprite.src = character.image;
+    sprite.alt = character.name;
   }
 
   // 名前
@@ -594,7 +593,7 @@ function updateBenchDisplay(player) {
     const hpPercentage = calculateHpPercentage(character.currentHp, character.maxHp);
 
     item.innerHTML = `
-      <div class="bench-image">${character.image}</div>
+      <img class="bench-image" src="${character.image}" alt="${character.name}">
       <div class="bench-info">
         <div class="bench-name">${character.name}</div>
         <div class="bench-hp-bar">
@@ -793,7 +792,7 @@ function renderFinalCharacter(player) {
     }
 
     item.innerHTML = `
-      <div class="final-image">${character.image}</div>
+      <img class="final-image" src="${character.image}" alt="${character.name}">
       <div class="final-name">${character.name}</div>
       <div class="final-hp">HP: ${character.currentHp}/${character.maxHp}</div>
     `;
@@ -837,7 +836,7 @@ function showSwitchModal() {
     const item = document.createElement('div');
     item.className = 'switch-item';
     item.innerHTML = `
-      <div class="switch-char-image">${character.image}</div>
+      <img class="switch-char-image" src="${character.image}" alt="${character.name}">
       <div class="switch-char-info">
         <div class="switch-char-name">${character.name}</div>
         <div class="switch-char-hp">HP: ${character.currentHp}/${character.maxHp}</div>

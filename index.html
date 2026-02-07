@@ -42,12 +42,15 @@
 
         <!-- バトル画面 -->
         <div id="battle-screen" class="screen hidden">
-            <h1>ポケモンバトル</h1>
+            <div class="battle-header">
+                <h1>ポケモンバトル</h1>
+            </div>
 
             <div class="battle-area">
-                <!-- プレイヤー1エリア -->
-                <div class="player-area" id="player1-area">
+                <!-- プレイヤー1エリア（左側） -->
+                <div class="player-area player-left" id="player1-area">
                     <h2>プレイヤー1</h2>
+
                     <div class="active-pokemon">
                         <div class="pokemon-sprite">
                             <img id="player1-sprite" src="" alt="プレイヤー1のポケモン">
@@ -63,6 +66,7 @@
                             </div>
                         </div>
                     </div>
+
                     <div class="team-pokemon">
                         <h3>控えのポケモン</h3>
                         <div id="player1-bench" class="bench-list">
@@ -71,7 +75,7 @@
                     </div>
                 </div>
 
-                <!-- バトルログ -->
+                <!-- バトルログ（中央） -->
                 <div class="battle-center">
                     <div class="battle-log-container">
                         <h3>バトルログ</h3>
@@ -81,9 +85,10 @@
                     </div>
                 </div>
 
-                <!-- プレイヤー2エリア -->
-                <div class="player-area" id="player2-area">
+                <!-- プレイヤー2エリア（右側） -->
+                <div class="player-area player-right" id="player2-area">
                     <h2>プレイヤー2</h2>
+
                     <div class="active-pokemon">
                         <div class="pokemon-sprite">
                             <img id="player2-sprite" src="" alt="プレイヤー2のポケモン">
@@ -99,6 +104,7 @@
                             </div>
                         </div>
                     </div>
+
                     <div class="team-pokemon">
                         <h3>控えのポケモン</h3>
                         <div id="player2-bench" class="bench-list">
@@ -109,9 +115,11 @@
             </div>
 
             <!-- アクションボタン -->
-            <div class="action-buttons" id="move-buttons">
-                <!-- 4つの技ボタンは動的に生成される -->
-                <button id="switch-btn" class="btn btn-switch">交代する</button>
+            <div class="battle-footer">
+                <div class="action-buttons" id="move-buttons">
+                    <!-- 4つの技ボタンは動的に生成される -->
+                    <button id="switch-btn" class="btn btn-switch">交代する</button>
+                </div>
             </div>
         </div>
 

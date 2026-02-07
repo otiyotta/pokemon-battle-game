@@ -5,7 +5,7 @@
       "name": "ゆういちん",
       "type": "fire",
       "maxHp": 120,
-      "image": "🔥",
+      "image": "yuichin.svg",
       "attacks": [
         {
           "name": "火炎放射",
@@ -34,7 +34,7 @@
       "name": "うみん",
       "type": "water",
       "maxHp": 130,
-      "image": "💧",
+      "image": "umin.svg",
       "attacks": [
         {
           "name": "水鉄砲",
@@ -63,7 +63,7 @@
       "name": "しゅうじん",
       "type": "electric",
       "maxHp": 110,
-      "image": "⚡",
+      "image": "shujin.svg",
       "attacks": [
         {
           "name": "10万ボルト",
@@ -92,7 +92,7 @@
       "name": "さゆん",
       "type": "grass",
       "maxHp": 125,
-      "image": "🌿",
+      "image": "sayun.svg",
       "attacks": [
         {
           "name": "はっぱカッター",

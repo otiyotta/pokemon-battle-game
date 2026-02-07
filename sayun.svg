@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="64" height="64">
+  <!-- Background transparency -->
+  <rect width="32" height="32" fill="transparent"/>
+
+  <!-- Body (grass green) -->
+  <rect x="10" y="18" width="12" height="10" fill="#32cd32"/>
+  <rect x="12" y="16" width="8" height="2" fill="#32cd32"/>
+
+  <!-- Head (leaf green) -->
+  <rect x="12" y="8" width="8" height="8" fill="#228b22"/>
+
+  <!-- Eyes (dark green) -->
+  <rect x="14" y="11" width="2" height="2" fill="#006400"/>
+  <rect x="18" y="11" width="2" height="2" fill="#006400"/>
+
+  <!-- Mouth (dark green) -->
+  <rect x="15" y="14" width="2" height="1" fill="#013220"/>
+
+  <!-- Leaf accents on head (light green) -->
+  <rect x="11" y="6" width="2" height="3" fill="#90ee90"/>
+  <rect x="10" y="7" width="1" height="2" fill="#90ee90"/>
+  <rect x="19" y="6" width="2" height="3" fill="#90ee90"/>
+  <rect x="21" y="7" width="1" height="2" fill="#90ee90"/>
+
+  <!-- Vine pattern on body -->
+  <rect x="11" y="20" width="1" height="4" fill="#006400"/>
+  <rect x="12" y="22" width="2" height="1" fill="#006400"/>
+  <rect x="19" y="21" width="1" height="4" fill="#006400"/>
+  <rect x="18" y="23" width="2" height="1" fill="#006400"/>
+
+  <!-- Arms (grass green) -->
+  <rect x="8" y="18" width="2" height="4" fill="#32cd32"/>
+  <rect x="22" y="18" width="2" height="4" fill="#32cd32"/>
+
+  <!-- Legs (dark green) -->
+  <rect x="12" y="28" width="3" height="4" fill="#013220"/>
+  <rect x="17" y="28" width="3" height="4" fill="#013220"/>
+
+  <!-- Flower accent (pink) -->
+  <rect x="16" y="6" width="2" height="2" fill="#ff69b4"/>
+</svg>
