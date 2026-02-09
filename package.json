@@ -7,11 +7,18 @@
     "test": "jest",
     "test:watch": "jest --watch"
   },
-  "keywords": ["pokemon", "game", "tdd"],
+  "keywords": [
+    "pokemon",
+    "game",
+    "tdd"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2"
   }
 }

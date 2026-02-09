@@ -32,6 +32,8 @@ async function loadCharacters(path = 'characters.json') {
       throw new Error(`Failed to load characters: ${response.status}`);
     }
     const data = await response.json();
+    console.log('[DEBUG] 読み込んだキャラクター:', data.characters);
+    console.log('[DEBUG] 最初のキャラクターのmaxMp:', data.characters[0]?.maxMp);
     return data.characters;
   } catch (error) {
     console.error('キャラクターデータの読み込みに失敗しました:', error);
@@ -84,12 +86,18 @@ function selectCharacter(state, player, character) {
   }
 
   // キャラクターをディープコピーしてcurrentHpとcurrentMpを初期化
+  console.log('[DEBUG] selectCharacter - 元のキャラクター:', character);
+  console.log('[DEBUG] selectCharacter - maxMp:', character.maxMp);
+
   const selectedCharacter = {
     ...character,
     currentHp: character.maxHp,
     currentMp: character.maxMp || 100,
     attacks: character.attacks.map(attack => ({ ...attack }))
   };
+
+  console.log('[DEBUG] selectCharacter - 選択後のキャラクター:', selectedCharacter);
+  console.log('[DEBUG] selectCharacter - currentMp:', selectedCharacter.currentMp);
 
   team.push(selectedCharacter);
 
@@ -614,6 +622,24 @@ function initBattleScreen() {
   gameState.winner = null;
   gameState.player1ActiveIndex = 0;
   gameState.player2ActiveIndex = 0;
+
+  // MPを明示的に初期化（バグ修正: currentMpがundefinedの場合に備えて）
+  console.log('[DEBUG] initBattleScreen - Player1Team:', gameState.player1Team);
+  console.log('[DEBUG] initBattleScreen - Player1Team[0].maxMp:', gameState.player1Team[0]?.maxMp);
+  console.log('[DEBUG] initBattleScreen - Player1Team[0].currentMp (before):', gameState.player1Team[0]?.currentMp);
+
+  gameState.player1Team.forEach(char => {
+    if (char.currentMp === undefined || char.currentMp === null) {
+      char.currentMp = char.maxMp || 100;
+    }
+  });
+  gameState.player2Team.forEach(char => {
+    if (char.currentMp === undefined || char.currentMp === null) {
+      char.currentMp = char.maxMp || 100;
+    }
+  });
+
+  console.log('[DEBUG] initBattleScreen - Player1Team[0].currentMp (after):', gameState.player1Team[0]?.currentMp);
 
   // 初期ログ
   addBattleLog(gameState, 'バトルスタート！');
