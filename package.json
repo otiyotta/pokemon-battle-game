@@ -1,0 +1,17 @@
+{
+  "name": "pokemon-battle-game",
+  "version": "1.0.0",
+  "description": "Pokemon Battle Game with TDD",
+  "main": "game.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "keywords": ["pokemon", "game", "tdd"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}
