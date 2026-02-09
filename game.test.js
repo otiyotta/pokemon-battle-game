@@ -1,6 +1,25 @@
 // ポケモンバトルゲーム - テストコード（3キャラクター対応版）
 // TDDアプローチでテストファースト
 
+const {
+  selectCharacter,
+  removeSelectedCharacter,
+  confirmTeamSelection,
+  executeAttack,
+  autoSwitch,
+  switchCharacter,
+  checkGameOver,
+  calculateHpPercentage,
+  addBattleLog,
+  transitionToScreen,
+  resetGame,
+  calculateRandomDamage,
+  canUseAttack,
+  consumeMP,
+  recoverMP,
+  getTypeEffectiveness
+} = require('./game.js');
+
 // ========================================
 // テスト用ヘルパー関数
 // ========================================
@@ -15,9 +34,10 @@ function createTestCharacter(id, name, maxHp) {
     type: 'テスト',
     image: '🎮',
     maxHp: maxHp,
+    maxMp: 100,
     attacks: [
-      { name: 'たいあたり', damage: 10 },
-      { name: 'ひっかく', damage: 15 }
+      { name: 'たいあたり', damage: 10, mpCost: 15 },
+      { name: 'ひっかく', damage: 15, mpCost: 15 }
     ]
   };
 }
@@ -179,11 +199,14 @@ describe('バトルロジック（3キャラクター対応）', () => {
     confirmTeamSelection(state, 2);
 
     const attack = state.player1Team[0].attacks[0];
+    const initialHp = state.player2Team[0].currentHp;
     const result = executeAttack(state, 1, attack);
 
     expect(result.success).toBe(true);
-    expect(result.damage).toBe(10);
-    expect(state.player2Team[0].currentHp).toBe(90);
+    // ランダムダメージ: 基本ダメージ10に0.85~1.15倍 → 8~11の範囲
+    expect(result.damage).toBeGreaterThanOrEqual(8);
+    expect(result.damage).toBeLessThanOrEqual(11);
+    expect(state.player2Team[0].currentHp).toBe(initialHp - result.damage);
     expect(state.currentTurn).toBe(2);
   });
 
@@ -407,6 +430,591 @@ describe('ユーティリティ関数', () => {
     expect(state.battleLog).toHaveLength(2);
     expect(state.battleLog[0]).toBe('テストメッセージ1');
     expect(state.battleLog[1]).toBe('テストメッセージ2');
+  });
+});
+
+// ========================================
+// ランダムダメージ変動のテスト
+// ========================================
+
+describe('ランダムダメージ変動', () => {
+  test('calculateRandomDamageは基本ダメージの85%から115%の範囲で値を返す', () => {
+    const baseDamage = 100;
+    const minExpected = 85;
+    const maxExpected = 115;
+
+    // 複数回実行して範囲を確認
+    for (let i = 0; i < 100; i++) {
+      const result = calculateRandomDamage(baseDamage);
+      expect(result).toBeGreaterThanOrEqual(minExpected);
+      expect(result).toBeLessThanOrEqual(maxExpected);
+    }
+  });
+
+  test('calculateRandomDamageは整数を返す', () => {
+    const baseDamage = 100;
+    const result = calculateRandomDamage(baseDamage);
+    expect(Number.isInteger(result)).toBe(true);
+  });
+
+  test('calculateRandomDamageはbaseDamageが0の場合でも動作する', () => {
+    const baseDamage = 0;
+    const result = calculateRandomDamage(baseDamage);
+    expect(result).toBe(0);
+  });
+
+  test('executeAttackはランダムダメージを適用する', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    const initialHp = state.player2Team[0].currentHp;
+    const attack = state.player1Team[0].attacks[0]; // たいあたり、damage: 10
+
+    const result = executeAttack(state, 1, attack);
+
+    expect(result.success).toBe(true);
+    expect(result.damage).toBeGreaterThanOrEqual(8); // 10 * 0.85 = 8.5 → 8
+    expect(result.damage).toBeLessThanOrEqual(11); // 10 * 1.15 = 11.5 → 11
+
+    const actualDamage = initialHp - state.player2Team[0].currentHp;
+    expect(actualDamage).toBe(result.damage);
+  });
+
+  test('executeAttackはランダムダメージ情報をバトルログに記録する', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    const attack = state.player1Team[0].attacks[0]; // たいあたり、damage: 10
+
+    executeAttack(state, 1, attack);
+
+    // バトルログに技名とダメージが記録されているか確認
+    const logMessages = state.battleLog.join(' ');
+    expect(logMessages).toContain('たいあたり');
+    expect(logMessages).toContain('ダメージ');
+  });
+
+  test('最小ダメージは1以上', () => {
+    const baseDamage = 1;
+
+    // 複数回実行して最小ダメージを確認
+    for (let i = 0; i < 100; i++) {
+      const result = calculateRandomDamage(baseDamage);
+      expect(result).toBeGreaterThanOrEqual(1);
+    }
+  });
+});
+
+// ========================================
+// MPシステムのテスト
+// ========================================
+
+describe('MPシステム', () => {
+  test('キャラクター選択時にMPが初期化される', () => {
+    const state = createTestState();
+    const character = state.allCharacters[0];
+
+    selectCharacter(state, 1, character);
+
+    expect(state.player1Team[0].currentMp).toBe(100);
+    expect(state.player1Team[0].maxMp).toBe(100);
+  });
+
+  test('MP十分な場合は攻撃を使用できる', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    const attacker = state.player1Team[0];
+    const attack = attacker.attacks[0]; // 威力10、MPコスト15のはず
+
+    const canUse = canUseAttack(attacker, attack);
+
+    expect(canUse).toBe(true);
+  });
+
+  test('MP不足の場合は攻撃を使用できない', () => {
+    const state = createTestState();
+
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    const attacker = state.player1Team[0];
+    const attack = attacker.attacks[0]; // MPコスト15のはず
+    attacker.currentMp = 10; // MPを10に設定
+
+    const canUse = canUseAttack(attacker, attack);
+
+    expect(canUse).toBe(false);
+  });
+
+  test('攻撃実行時にMPが消費される', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    const attacker = state.player1Team[0];
+    const attack = attacker.attacks[0]; // MPコスト15のはず
+    const initialMp = attacker.currentMp;
+
+    executeAttack(state, 1, attack);
+
+    expect(attacker.currentMp).toBe(initialMp - 15);
+  });
+
+  test('MP不足時は攻撃が失敗する', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    const attacker = state.player1Team[0];
+    const attack = attacker.attacks[0]; // MPコスト15のはず
+    attacker.currentMp = 10; // MP不足に設定
+
+    const result = executeAttack(state, 1, attack);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('MPが足りません');
+    expect(state.currentTurn).toBe(1); // ターンは変わらない
+  });
+
+  test('ターン終了時に相手のMPが回復する', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    const player2Active = state.player2Team[0];
+    player2Active.currentMp = 50; // MPを50に設定
+
+    const attack = state.player1Team[0].attacks[0];
+    executeAttack(state, 1, attack);
+
+    // プレイヤー2のMPが20回復しているはず
+    expect(player2Active.currentMp).toBe(70);
+  });
+
+  test('MPは最大値を超えて回復しない', () => {
+    const state = createTestState();
+
+    // チーム設定
+    selectCharacter(state, 1, state.allCharacters[0]);
+    selectCharacter(state, 1, state.allCharacters[1]);
+    selectCharacter(state, 1, state.allCharacters[2]);
+    confirmTeamSelection(state, 1);
+
+    selectCharacter(state, 2, state.allCharacters[0]);
+    selectCharacter(state, 2, state.allCharacters[1]);
+    selectCharacter(state, 2, state.allCharacters[2]);
+    confirmTeamSelection(state, 2);
+
+    const player2Active = state.player2Team[0];
+    player2Active.currentMp = 95; // MPを95に設定（最大100）
+
+    const attack = state.player1Team[0].attacks[0];
+    executeAttack(state, 1, attack);
+
+    // 95 + 20 = 115だが、最大100まで
+    expect(player2Active.currentMp).toBe(100);
+  });
+
+  test('consumeMP関数が正しく動作する', () => {
+    const state = createTestState();
+    selectCharacter(state, 1, state.allCharacters[0]);
+    const character = state.player1Team[0];
+
+    character.currentMp = 100;
+    consumeMP(character, 30);
+
+    expect(character.currentMp).toBe(70);
+  });
+
+  test('recoverMP関数が正しく動作する', () => {
+    const state = createTestState();
+    selectCharacter(state, 1, state.allCharacters[0]);
+    const character = state.player1Team[0];
+
+    character.currentMp = 50;
+    recoverMP(character, 20);
+
+    expect(character.currentMp).toBe(70);
+  });
+
+  test('recoverMP関数は最大値を超えない', () => {
+    const state = createTestState();
+    selectCharacter(state, 1, state.allCharacters[0]);
+    const character = state.player1Team[0];
+
+    character.currentMp = 95;
+    recoverMP(character, 20);
+
+    expect(character.currentMp).toBe(100);
+  });
+});
+
+// ========================================
+// 属性相性のテスト
+// ========================================
+
+describe('属性相性システム', () => {
+  describe('getTypeEffectiveness関数', () => {
+    test('fire → grass: 2倍（効果抜群）', () => {
+      expect(getTypeEffectiveness('fire', 'grass')).toBe(2);
+    });
+
+    test('grass → water: 2倍（効果抜群）', () => {
+      expect(getTypeEffectiveness('grass', 'water')).toBe(2);
+    });
+
+    test('water → fire: 2倍（効果抜群）', () => {
+      expect(getTypeEffectiveness('water', 'fire')).toBe(2);
+    });
+
+    test('electric → water: 2倍（効果抜群）', () => {
+      expect(getTypeEffectiveness('electric', 'water')).toBe(2);
+    });
+
+    test('fire → water: 0.5倍（効果いまひとつ）', () => {
+      expect(getTypeEffectiveness('fire', 'water')).toBe(0.5);
+    });
+
+    test('water → grass: 0.5倍（効果いまひとつ）', () => {
+      expect(getTypeEffectiveness('water', 'grass')).toBe(0.5);
+    });
+
+    test('grass → fire: 0.5倍（効果いまひとつ）', () => {
+      expect(getTypeEffectiveness('grass', 'fire')).toBe(0.5);
+    });
+
+    test('water → electric: 0.5倍（効果いまひとつ）', () => {
+      expect(getTypeEffectiveness('water', 'electric')).toBe(0.5);
+    });
+
+    test('fire → fire: 1倍（通常）', () => {
+      expect(getTypeEffectiveness('fire', 'fire')).toBe(1);
+    });
+
+    test('water → water: 1倍（通常）', () => {
+      expect(getTypeEffectiveness('water', 'water')).toBe(1);
+    });
+
+    test('electric → electric: 1倍（通常）', () => {
+      expect(getTypeEffectiveness('electric', 'electric')).toBe(1);
+    });
+
+    test('grass → grass: 1倍（通常）', () => {
+      expect(getTypeEffectiveness('grass', 'grass')).toBe(1);
+    });
+
+    test('electric → fire: 1倍（未定義の組み合わせ）', () => {
+      expect(getTypeEffectiveness('electric', 'fire')).toBe(1);
+    });
+
+    test('electric → grass: 1倍（未定義の組み合わせ）', () => {
+      expect(getTypeEffectiveness('electric', 'grass')).toBe(1);
+    });
+
+    test('grass → electric: 1倍（未定義の組み合わせ）', () => {
+      expect(getTypeEffectiveness('grass', 'electric')).toBe(1);
+    });
+
+    test('fire → electric: 1倍（未定義の組み合わせ）', () => {
+      expect(getTypeEffectiveness('fire', 'electric')).toBe(1);
+    });
+  });
+
+  describe('executeAttackで属性相性が反映される', () => {
+    test('効果抜群（2倍）のダメージを与える', () => {
+      const state = createTestState();
+
+      // fire属性とgrass属性のキャラクターを作成
+      const fireChar = {
+        id: 'fire1',
+        name: 'ファイアー',
+        type: 'fire',
+        image: '🔥',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'ほのお', damage: 30, mpCost: 15 }]
+      };
+
+      const grassChar = {
+        id: 'grass1',
+        name: 'グラッシー',
+        type: 'grass',
+        image: '🌿',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'はっぱ', damage: 30, mpCost: 15 }]
+      };
+
+      state.player1Team = [fireChar];
+      state.player2Team = [grassChar];
+      state.currentTurn = 1;
+
+      const attack = fireChar.attacks[0];
+      const result = executeAttack(state, 1, attack);
+
+      expect(result.success).toBe(true);
+      // ランダムダメージがあるので範囲でチェック: 30 * 2 = 60, 60 * 0.85 = 51, 60 * 1.15 = 69
+      expect(result.damage).toBeGreaterThanOrEqual(51);
+      expect(result.damage).toBeLessThanOrEqual(69);
+    });
+
+    test('効果いまひとつ（0.5倍）のダメージを与える', () => {
+      const state = createTestState();
+
+      // fire属性とwater属性のキャラクターを作成
+      const fireChar = {
+        id: 'fire1',
+        name: 'ファイアー',
+        type: 'fire',
+        image: '🔥',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'ほのお', damage: 30, mpCost: 15 }]
+      };
+
+      const waterChar = {
+        id: 'water1',
+        name: 'ウォーター',
+        type: 'water',
+        image: '💧',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'みず', damage: 30, mpCost: 15 }]
+      };
+
+      state.player1Team = [fireChar];
+      state.player2Team = [waterChar];
+      state.currentTurn = 1;
+
+      const attack = fireChar.attacks[0];
+      const result = executeAttack(state, 1, attack);
+
+      expect(result.success).toBe(true);
+      // ランダムダメージがあるので範囲でチェック: 30 * 0.5 = 15, 15 * 0.85 = 12.75 → 12, 15 * 1.15 = 17.25 → 17
+      expect(result.damage).toBeGreaterThanOrEqual(12);
+      expect(result.damage).toBeLessThanOrEqual(17);
+    });
+
+    test('通常（1倍）のダメージを与える', () => {
+      const state = createTestState();
+
+      // fire属性同士のキャラクターを作成
+      const fireChar1 = {
+        id: 'fire1',
+        name: 'ファイアー1',
+        type: 'fire',
+        image: '🔥',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'ほのお', damage: 30, mpCost: 15 }]
+      };
+
+      const fireChar2 = {
+        id: 'fire2',
+        name: 'ファイアー2',
+        type: 'fire',
+        image: '🔥',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'ほのお', damage: 30, mpCost: 15 }]
+      };
+
+      state.player1Team = [fireChar1];
+      state.player2Team = [fireChar2];
+      state.currentTurn = 1;
+
+      const attack = fireChar1.attacks[0];
+      const result = executeAttack(state, 1, attack);
+
+      expect(result.success).toBe(true);
+      // ランダムダメージがあるので範囲でチェック: 30 * 1 = 30, 30 * 0.85 = 25.5 → 25, 30 * 1.15 = 34.5 → 34
+      expect(result.damage).toBeGreaterThanOrEqual(25);
+      expect(result.damage).toBeLessThanOrEqual(34);
+    });
+
+    test('バトルログに「効果抜群！」を表示', () => {
+      const state = createTestState();
+
+      const fireChar = {
+        id: 'fire1',
+        name: 'ファイアー',
+        type: 'fire',
+        image: '🔥',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'ほのお', damage: 30, mpCost: 15 }]
+      };
+
+      const grassChar = {
+        id: 'grass1',
+        name: 'グラッシー',
+        type: 'grass',
+        image: '🌿',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'はっぱ', damage: 30, mpCost: 15 }]
+      };
+
+      state.player1Team = [fireChar];
+      state.player2Team = [grassChar];
+      state.currentTurn = 1;
+
+      const attack = fireChar.attacks[0];
+      executeAttack(state, 1, attack);
+
+      expect(state.battleLog).toContain('効果抜群！');
+    });
+
+    test('バトルログに「効果いまひとつ...」を表示', () => {
+      const state = createTestState();
+
+      const fireChar = {
+        id: 'fire1',
+        name: 'ファイアー',
+        type: 'fire',
+        image: '🔥',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'ほのお', damage: 30, mpCost: 15 }]
+      };
+
+      const waterChar = {
+        id: 'water1',
+        name: 'ウォーター',
+        type: 'water',
+        image: '💧',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'みず', damage: 30, mpCost: 15 }]
+      };
+
+      state.player1Team = [fireChar];
+      state.player2Team = [waterChar];
+      state.currentTurn = 1;
+
+      const attack = fireChar.attacks[0];
+      executeAttack(state, 1, attack);
+
+      expect(state.battleLog).toContain('効果いまひとつ...');
+    });
+
+    test('通常ダメージの時は相性メッセージを表示しない', () => {
+      const state = createTestState();
+
+      const fireChar1 = {
+        id: 'fire1',
+        name: 'ファイアー1',
+        type: 'fire',
+        image: '🔥',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'ほのお', damage: 30, mpCost: 15 }]
+      };
+
+      const fireChar2 = {
+        id: 'fire2',
+        name: 'ファイアー2',
+        type: 'fire',
+        image: '🔥',
+        maxHp: 100,
+        currentHp: 100,
+        maxMp: 100,
+        currentMp: 100,
+        attacks: [{ name: 'ほのお', damage: 30, mpCost: 15 }]
+      };
+
+      state.player1Team = [fireChar1];
+      state.player2Team = [fireChar2];
+      state.currentTurn = 1;
+
+      const attack = fireChar1.attacks[0];
+      executeAttack(state, 1, attack);
+
+      expect(state.battleLog).not.toContain('効果抜群！');
+      expect(state.battleLog).not.toContain('効果いまひとつ...');
+    });
   });
 });
 

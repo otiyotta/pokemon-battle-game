@@ -5,26 +5,31 @@
       "name": "ゆういちん",
       "type": "fire",
       "maxHp": 120,
+      "maxMp": 100,
       "image": "yuichin.svg",
       "attacks": [
         {
           "name": "火炎放射",
           "damage": 30,
+          "mpCost": 25,
           "description": "炎を吐いて攻撃する"
         },
         {
           "name": "火柱",
           "damage": 45,
+          "mpCost": 35,
           "description": "巨大な火柱で大ダメージを与える"
         },
         {
           "name": "燃焼",
           "damage": 20,
+          "mpCost": 15,
           "description": "継続的なダメージを与える小さな炎"
         },
         {
           "name": "爆炎",
           "damage": 40,
+          "mpCost": 35,
           "description": "爆発的な炎で攻撃"
         }
       ]
@@ -34,26 +39,31 @@
       "name": "うみん",
       "type": "water",
       "maxHp": 130,
+      "maxMp": 100,
       "image": "umin.svg",
       "attacks": [
         {
           "name": "水鉄砲",
           "damage": 25,
+          "mpCost": 25,
           "description": "水を勢いよく飛ばす"
         },
         {
           "name": "波乗り",
           "damage": 40,
+          "mpCost": 35,
           "description": "大きな波で攻撃する"
         },
         {
           "name": "渦潮",
           "damage": 35,
+          "mpCost": 25,
           "description": "渦を巻いた水で相手を巻き込む"
         },
         {
           "name": "ハイドロポンプ",
           "damage": 50,
+          "mpCost": 50,
           "description": "最強の水流攻撃"
         }
       ]
@@ -63,26 +73,31 @@
       "name": "しゅうじん",
       "type": "electric",
       "maxHp": 110,
+      "maxMp": 100,
       "image": "shujin.svg",
       "attacks": [
         {
           "name": "10万ボルト",
           "damage": 50,
+          "mpCost": 50,
           "description": "強力な電撃を放つ"
         },
         {
           "name": "雷",
           "damage": 35,
+          "mpCost": 25,
           "description": "落雷で攻撃する"
         },
         {
           "name": "電気ショック",
           "damage": 20,
+          "mpCost": 15,
           "description": "小さな電気で攻撃する"
         },
         {
           "name": "スパーク",
           "damage": 15,
+          "mpCost": 15,
           "description": "小さな電撃で素早く攻撃"
         }
       ]
@@ -92,26 +107,31 @@
       "name": "さゆん",
       "type": "grass",
       "maxHp": 125,
+      "maxMp": 100,
       "image": "sayun.svg",
       "attacks": [
         {
           "name": "はっぱカッター",
           "damage": 30,
+          "mpCost": 25,
           "description": "鋭い葉っぱで切りつける"
         },
         {
           "name": "ソーラービーム",
           "damage": 45,
+          "mpCost": 35,
           "description": "太陽の光を集めて強力なビームを放つ"
         },
         {
           "name": "宿り木の種",
           "damage": 15,
+          "mpCost": 15,
           "description": "種を植え付けて少しずつダメージを与える"
         },
         {
           "name": "ギガドレイン",
           "damage": 38,
+          "mpCost": 35,
           "description": "エネルギーを吸収する"
         }
       ]

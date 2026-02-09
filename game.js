@@ -83,10 +83,11 @@ function selectCharacter(state, player, character) {
     return { success: false, error: '最大3体まで選択できます' };
   }
 
-  // キャラクターをディープコピーしてcurrentHpを初期化
+  // キャラクターをディープコピーしてcurrentHpとcurrentMpを初期化
   const selectedCharacter = {
     ...character,
     currentHp: character.maxHp,
+    currentMp: character.maxMp || 100,
     attacks: character.attacks.map(attack => ({ ...attack }))
   };
 
@@ -136,6 +137,94 @@ function confirmTeamSelection(state, player) {
 // ========================================
 
 /**
+ * ランダムダメージ変動を計算する
+ * @param {number} baseDamage - 基本ダメージ
+ * @returns {number} ランダム変動を適用したダメージ（整数）
+ */
+function calculateRandomDamage(baseDamage) {
+  // baseDamageが0の場合はそのまま0を返す
+  if (baseDamage === 0) {
+    return 0;
+  }
+
+  // 0.85から1.15の範囲でランダムな倍率を生成
+  const minMultiplier = 0.85;
+  const maxMultiplier = 1.15;
+  const randomMultiplier = minMultiplier + Math.random() * (maxMultiplier - minMultiplier);
+
+  // ダメージを計算して整数に丸める
+  const damage = Math.round(baseDamage * randomMultiplier);
+
+  // 最小ダメージは1
+  return Math.max(1, damage);
+}
+
+/**
+ * 属性相性による倍率を取得する
+ * @param {string} attackerType - 攻撃側の属性（fire, water, electric, grass）
+ * @param {string} defenderType - 防御側の属性（fire, water, electric, grass）
+ * @returns {number} 相性倍率（0.5, 1, 2）
+ */
+function getTypeEffectiveness(attackerType, defenderType) {
+  // 効果抜群（2倍）の組み合わせ
+  const superEffective = {
+    'fire': ['grass'],      // fire → grass: 2倍
+    'grass': ['water'],     // grass → water: 2倍
+    'water': ['fire'],      // water → fire: 2倍
+    'electric': ['water']   // electric → water: 2倍
+  };
+
+  // 効果いまひとつ（0.5倍）の組み合わせ
+  const notVeryEffective = {
+    'fire': ['water'],      // fire → water: 0.5倍
+    'water': ['grass', 'electric'],  // water → grass, electric: 0.5倍
+    'grass': ['fire']       // grass → fire: 0.5倍
+  };
+
+  // 効果抜群チェック
+  if (superEffective[attackerType]?.includes(defenderType)) {
+    return 2;
+  }
+
+  // 効果いまひとつチェック
+  if (notVeryEffective[attackerType]?.includes(defenderType)) {
+    return 0.5;
+  }
+
+  // 通常（同タイプや未定義の組み合わせ）
+  return 1;
+}
+
+/**
+ * 攻撃を使用できるかチェックする
+ * @param {Object} character - キャラクター
+ * @param {Object} attack - 攻撃
+ * @returns {boolean} 使用可能ならtrue
+ */
+function canUseAttack(character, attack) {
+  const mpCost = attack.mpCost || 0;
+  return character.currentMp >= mpCost;
+}
+
+/**
+ * MPを消費する
+ * @param {Object} character - キャラクター
+ * @param {number} mpCost - 消費MP
+ */
+function consumeMP(character, mpCost) {
+  character.currentMp -= mpCost;
+}
+
+/**
+ * MPを回復する
+ * @param {Object} character - キャラクター
+ * @param {number} amount - 回復量
+ */
+function recoverMP(character, amount) {
+  character.currentMp = Math.min(character.maxMp || 100, character.currentMp + amount);
+}
+
+/**
  * 攻撃を実行する（3キャラクター対応）
  * @param {Object} state - ゲーム状態
  * @param {number} player - 攻撃するプレイヤー番号（1 or 2）
@@ -157,12 +246,33 @@ function executeAttack(state, player, attack) {
   const attacker = attackerTeam[attackerIndex];
   const defender = defenderTeam[defenderIndex];
 
-  // ダメージを計算して適用
-  const damage = attack.damage;
+  // MP チェック
+  if (!canUseAttack(attacker, attack)) {
+    return { success: false, error: 'MPが足りません' };
+  }
+
+  // MP消費
+  const mpCost = attack.mpCost || 0;
+  consumeMP(attacker, mpCost);
+
+  // 属性相性による倍率を取得
+  const typeEffectiveness = getTypeEffectiveness(attacker.type, defender.type);
+
+  // ダメージを計算して適用（属性相性を考慮、ランダム変動を適用）
+  const baseDamage = attack.damage * typeEffectiveness;
+  const damage = calculateRandomDamage(baseDamage);
   defender.currentHp = Math.max(0, defender.currentHp - damage);
 
   // バトルログに追加
   addBattleLog(state, `${attacker.name}の${attack.name}！`);
+
+  // 属性相性メッセージを追加
+  if (typeEffectiveness === 2) {
+    addBattleLog(state, '効果抜群！');
+  } else if (typeEffectiveness === 0.5) {
+    addBattleLog(state, '効果いまひとつ...');
+  }
+
   addBattleLog(state, `${defender.name}に${damage}のダメージ！`);
 
   // 戦闘不能チェック
@@ -179,6 +289,9 @@ function executeAttack(state, player, attack) {
       addBattleLog(state, `${newDefender.name}が出てきた！`);
     }
   }
+
+  // 相手のMP回復（ターン終了時）
+  recoverMP(defender, 20);
 
   // ターンを交代
   state.currentTurn = player === 1 ? 2 : 1;
@@ -562,6 +675,9 @@ function updatePlayerUI(player) {
 
   // HP
   updateHPDisplay(player, character);
+
+  // MP表示を追加
+  updateMPDisplay(player, character);
 }
 
 /**
@@ -600,6 +716,10 @@ function updateBenchDisplay(player) {
           <div class="bench-hp-fill" style="width: ${hpPercentage}%"></div>
         </div>
         <div class="bench-hp-text">${character.currentHp}/${character.maxHp}</div>
+        <div class="bench-mp-bar">
+          <div class="bench-mp-fill" style="width: ${(character.currentMp / (character.maxMp || 100)) * 100}%"></div>
+        </div>
+        <div class="bench-mp-text">MP: ${character.currentMp}/${character.maxMp || 100}</div>
       </div>
     `;
 
@@ -632,6 +752,31 @@ function updateHPDisplay(player, character) {
     } else {
       hpBar.style.backgroundColor = '#f44336';
     }
+  }
+}
+
+/**
+ * MPの表示を更新する
+ * @param {number} player - プレイヤー番号
+ * @param {Object} character - キャラクターデータ
+ */
+function updateMPDisplay(player, character) {
+  const mpText = document.getElementById(`player${player}-mp-text`);
+  const mpBar = document.getElementById(`player${player}-mp-bar`);
+
+  // currentMpがundefinedの場合は初期化
+  if (character.currentMp === undefined) {
+    character.currentMp = character.maxMp || 100;
+  }
+
+  if (mpText) {
+    mpText.textContent = `${character.currentMp}/${character.maxMp || 100}`;
+  }
+
+  if (mpBar) {
+    const maxMp = character.maxMp || 100;
+    const percentage = (character.currentMp / maxMp) * 100;
+    mpBar.style.width = `${percentage}%`;
   }
 }
 
@@ -694,7 +839,16 @@ function updateMoveButtons() {
   character.attacks.forEach(attack => {
     const button = document.createElement('button');
     button.className = 'btn btn-attack';
-    button.textContent = `${attack.name} (威力: ${attack.damage})`;
+    const mpCost = attack.mpCost || 0;
+    button.textContent = `${attack.name} (威力: ${attack.damage}, MP: ${mpCost})`;
+
+    // MP不足の場合はボタンを無効化
+    if (!canUseAttack(character, attack)) {
+      button.disabled = true;
+      button.classList.add('disabled');
+      button.title = 'MPが足りません';
+    }
+
     button.addEventListener('click', () => handleAttackClick(attack));
     moveButtons.appendChild(button);
   });
@@ -942,8 +1096,13 @@ if (typeof module !== 'undefined' && module.exports) {
     checkGameOver,
     checkWinCondition,
     calculateHpPercentage,
+    calculateRandomDamage,
     addBattleLog,
     transitionToScreen,
-    resetGame
+    resetGame,
+    getTypeEffectiveness,
+    canUseAttack,
+    consumeMP,
+    recoverMP
   };
 }
